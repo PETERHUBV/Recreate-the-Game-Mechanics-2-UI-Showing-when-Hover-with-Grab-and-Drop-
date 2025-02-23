@@ -1,4 +1,5 @@
-using Unity.VisualScripting;
+
+using JetBrains.Annotations;
 using UnityEngine;
 using UnityEngine.UI;
 public class PlayerControls : MonoBehaviour
@@ -9,6 +10,7 @@ public class PlayerControls : MonoBehaviour
     public float cameraheight = 2f;
     public float lookSpeedX = 2f;
     public float lookSpeedY = 2f;
+
 
     public CharacterController characterController;
     public Transform CameraTransform;
@@ -26,32 +28,41 @@ public class PlayerControls : MonoBehaviour
         CameraTransform = Camera.main.transform;
     }
 
-    void Update()
+    public void Update()
     {
         MovePlayer();
         RotatePlayer();
         HandleCamera();
+        DropandPick();
 
 
-        if (isNearDraggable && Input.GetKey(KeyCode.E))
+
+
+    void DropandPick()
         {
-           
-              
-                    if (!isHoldingObject)
-                    {
+            if (isNearDraggable && Input.GetKeyDown(KeyCode.E))
+            {
 
-                        PickUpObject();
-                    }
-                    else
-                    {
 
-                        DropObject();
-                    }
+                if (!isHoldingObject)
+                {
+
+                    PickUpObject();
                 }
             }
-        
+            if (isHoldingObject && Input.GetKeyDown(KeyCode.R))
+            {
 
-    void MovePlayer()
+
+                DropObject();
+            }
+        }
+    }
+       
+
+
+
+    private void MovePlayer()
     {
         float horizontal = Input.GetAxis("Horizontal");
         float vertical = Input.GetAxis("Vertical");
@@ -82,18 +93,20 @@ public class PlayerControls : MonoBehaviour
         CameraTransform.localRotation = Quaternion.Euler(rotationX, 0f, 0f);
     }
 
-    void HandleCamera()
+    private void HandleCamera()
     {
         Vector3 cameraPosition = transform.position - transform.forward * cameraDistance + Vector3.up * cameraheight;
         CameraTransform.position = Vector3.Lerp(CameraTransform.position, cameraPosition, Time.deltaTime * 5f);
-        CameraTransform.LookAt(transform.position + Vector3.up * 1.5f);
+        CameraTransform.rotation = Quaternion.Euler(0f, transform.eulerAngles.y, 0f);
     }
 
 
     private void OnTriggerEnter(Collider other)
     {
-        if (other.CompareTag("Draggable"))
+       
+        if (other.CompareTag("Draggable") && !isHoldingObject)
         {
+           
             currentDraggableObject = other.gameObject;
             uiText.text = "Pick Up";
             isNearDraggable = true;
@@ -105,7 +118,7 @@ public class PlayerControls : MonoBehaviour
     {
         if (other.CompareTag("Draggable"))
         {
-            
+
             if (!isHoldingObject)
             {
                 uiText.text = "";
@@ -115,34 +128,49 @@ public class PlayerControls : MonoBehaviour
         }
     }
 
+    private bool IsObjectWithinRange(Collider other)
+    {
+        float grabRange = 3f; 
+        float distance = Vector3.Distance(transform.position, other.transform.position);
+        return distance <= grabRange;
+    }
+
+
 
     private void PickUpObject()
     {
-        if (currentDraggableObject != null)
+        if (currentDraggableObject != null && !isHoldingObject)
         {
-
+           
             Rigidbody rb = currentDraggableObject.GetComponent<Rigidbody>();
             if (rb != null)
             {
-                rb.isKinematic = true;  
+                rb.isKinematic = true;
+                rb.useGravity = false;
             }
             currentDraggableObject.transform.SetParent(transform);
-            currentDraggableObject.transform.localPosition = new Vector3(0, 1, 2);
+            currentDraggableObject.transform.localPosition = new Vector3(0, 1f, 2f);
             uiText.text = "Drop";
             isHoldingObject = true;
+
+           
         }
     }
 
 
     private void DropObject()
     {
-        if (currentDraggableObject != null)
+        
+        if (currentDraggableObject != null && isHoldingObject)
         {
+            
             currentDraggableObject.transform.SetParent(null);
             Rigidbody rb = currentDraggableObject.GetComponent<Rigidbody>();
-            if (rb != null)
+            if (rb != null && !isHoldingObject)
             {
                 rb.isKinematic = false;
+                rb.useGravity = true;
+                rb.AddForce(Vector3.down * 1f, ForceMode.Impulse);
             }
             currentDraggableObject = null;
             uiText.text = "";
@@ -151,7 +179,7 @@ public class PlayerControls : MonoBehaviour
         }
         else
         {
-            Debug.LogWarning("No object to drop!");
+            Debug.Log("No object to drop or not holding anything.");
         }
     }
 }
